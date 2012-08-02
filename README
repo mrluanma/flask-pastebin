@@ -3,12 +3,13 @@
   // Flask-Pastebin //
 
      This application implements an example pastebin with Flask,
-     Flask-OAuth, Flask-SQLAlchemy, Flask-Script, as well as
-     Juggernaut to show off some realtime things.
+     [rauth](https://github.com/litl/rauth/), Flask-SQLAlchemy,
+     Flask-Script, as well as Juggernaut to show off some realtime
+     things.
 
   What can it do?
 
-    * Facebook Connect
+    * Login with [Weibo](www.weibo.com) account
     * Realtime push notifications with Juggernaut
     * Shows simple pagination
 
@@ -24,4 +25,3 @@
   How to install juggernaut?
 
     $ npm install -g juggernaut
-

@@ -18,7 +18,7 @@
     <li><a href="{{ url_for('my_pastes') }}">My Pastes</a>
     <li><a href="{{ url_for('logout') }}">Sign out ({{ g.user.display_name }})</a>
     {% else %}
-    <li><a href="{{ url_for('login') }}">Sign in with Facebook</a>
+    <li><a href="{{ url_for('login') }}">Sign in with Weibo</a>
     {% endif %}
   </ul>
   {% for message in get_flashed_messages() %}

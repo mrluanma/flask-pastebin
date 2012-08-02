@@ -2,24 +2,22 @@ from datetime import datetime
 from flask import Flask, request, url_for, redirect, g, session, flash, \
      abort, render_template
 from flask.ext.sqlalchemy import SQLAlchemy
-from flask.ext.oauth import OAuth
+from rauth.service import OAuth2Service
 from juggernaut import Juggernaut
 
 
 app = Flask(__name__)
 app.config.from_pyfile('config.cfg')
 db = SQLAlchemy(app)
-oauth = OAuth()
 jug = Juggernaut()
 
-facebook = oauth.remote_app('facebook',
-    base_url='https://graph.facebook.com/',
-    request_token_url=None,
-    access_token_url='/oauth/access_token',
-    authorize_url='https://www.facebook.com/dialog/oauth',
-    consumer_key='188477911223606',
-    consumer_secret='621413ddea2bcc5b2e83d42fc40495de',
-    request_token_params={'scope': 'email'}
+
+wb = OAuth2Service(
+    name='wb',
+    consumer_key=app.config['WB_CLIENT_ID'],
+    consumer_secret=app.config['WB_CLIENT_SECRET'],
+    access_token_url='https://api.weibo.com/oauth2/access_token',
+    authorize_url='https://api.weibo.com/oauth2/authorize',
 )
 
 
@@ -49,7 +47,7 @@ class Paste(db.Model):
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     display_name = db.Column(db.String(120))
-    fb_id = db.Column(db.String(30), unique=True)
+    wb_id = db.Column(db.String(30), unique=True)
     pastes = db.relationship(Paste, lazy='dynamic', backref='user')
 
 
@@ -122,9 +120,11 @@ def my_pastes(page):
 
 @app.route('/login')
 def login():
-    return facebook.authorize(callback=url_for('facebook_authorized',
-        next=request.args.get('next') or request.referrer or None,
-        _external=True))
+    url = wb.get_authorize_url(
+        redirect_uri=url_for('wb_authorized', _external=True),
+        response_type='code'
+    )
+    return redirect(url)
 
 
 @app.route('/logout')
@@ -135,30 +135,33 @@ def logout():
 
 
 @app.route('/login/authorized')
-@facebook.authorized_handler
-def facebook_authorized(resp):
+def wb_authorized():
     next_url = request.args.get('next') or url_for('new_paste')
-    if resp is None:
+    if 'error' in request.args:
         flash('You denied the login')
         return redirect(next_url)
 
-    session['fb_access_token'] = (resp['access_token'], '')
+    data = dict(
+        code=request.args['code'],
+        redirect_uri=url_for('wb_authorized', _external=True),
+    )
+    token = wb.get_access_token('POST', data=data).content
 
-    me = facebook.get('/me')
-    user = User.query.filter_by(fb_id=me.data['id']).first()
+    params = dict(
+        source=wb.consumer_key,
+        access_token=token['access_token'],
+        uid=token['uid'],
+    )
+    me = wb.get('https://api.weibo.com/2/users/show.json', params=params)
+    user = User.query.filter_by(wb_id=me.content['id']).first()
     if user is None:
         user = User()
-        user.fb_id = me.data['id']
+        user.wb_id = me.content['id']
         db.session.add(user)
 
-    user.display_name = me.data['name']
+    user.display_name = me.content['name']
     db.session.commit()
     session['user_id'] = user.id
 
     flash('You are now logged in as %s' % user.display_name)
     return redirect(next_url)
-
-
-@facebook.tokengetter
-def get_facebook_oauth_token():
-    return session.get('fb_access_token')
